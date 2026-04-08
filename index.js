@@ -15,6 +15,9 @@ const todosRouter = require("./routers/todos.router");
 const PORT = Number(process.env.PORT) || 5001;
 
 function buildMongoUri() {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
   if (process.env.MONGO_URI || process.env.MONGODB_URI) {
     return process.env.MONGO_URI || process.env.MONGODB_URI;
   }
@@ -124,9 +127,13 @@ function createApp() {
   return app;
 }
 
+const mongooseConnectOptions = {
+  serverSelectionTimeoutMS: 25_000,
+};
+
 async function main() {
   const uri = buildMongoUri();
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, mongooseConnectOptions);
   console.log("연결 성공");
 
   const app = createApp();
@@ -144,5 +151,13 @@ async function main() {
 
 main().catch((err) => {
   console.error("MongoDB 연결 실패:", err.message);
+  if (process.env.DYNO) {
+    console.error(
+      "[Heroku] Atlas → Network Access → IP Access List 에 0.0.0.0/0 추가(임시·개발용) 또는 Atlas IP Access 에서 클라우드 제공업체 허용."
+    );
+    console.error(
+      "[Heroku] Settings → Config Vars 에 MONGO_URI(또는 DATABASE_URL) 전체 mongodb+srv://... 문자열이 있는지 확인(.env 파일은 배포되지 않음)."
+    );
+  }
   process.exit(1);
 });
